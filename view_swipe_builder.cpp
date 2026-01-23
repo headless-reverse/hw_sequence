@@ -373,10 +373,14 @@ void ViewSwipeBuilder::deleteSelected() {
 void ViewSwipeBuilder::editSelected() {
     int row = m_list->currentRow();
     if (row < 0) return;
-    SwipeAction cur = m_model->actionAt(row);
-    ActionEditDialog dlg(cur, this); 
+
+    SwipeAction action = m_model->actionAt(row);
+    ActionEditDialog dlg(action, this);
+    
     if (dlg.exec() == QDialog::Accepted) {
-        m_model->editActionAt(row, cur);}}
+        m_model->editActionAt(row, action);
+    }
+}
 
 void ViewSwipeBuilder::moveSelectedUp() {
     int row = m_list->currentRow();
