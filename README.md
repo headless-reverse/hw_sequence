@@ -41,7 +41,6 @@ RestartSec=5
 
 StandardOutput=journal
 StandardError=journal
-
 [Install]
 WantedBy=multi-user.target
 ```
@@ -49,15 +48,14 @@ WantedBy=multi-user.target
 ```
 # /usr/local/etc/adb_sequence.conf
 #./adb_sequence_d --server --port 12345
-
 [Settings]
 # Ta wartość może zostać nadpisana przez flagę CLI: --adb-path
 adbPath=/usr/bin/adb
-
 # Numer seryjny . Jeśli puste, ADB wybierze jedyne dostępne.
 # nadpisać flagą CLI: --device-serial
 targetSerial=
-
 # nadpisać flagą CLI: --port
 serverPort=12345
 ```
+
+
