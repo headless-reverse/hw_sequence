@@ -28,12 +28,6 @@ void SwipeModel::addCommand(const QString &command, int delayMs, const QString &
     m_actions.append(SwipeAction(SwipeAction::Key, 0, 0, 0, 0, 0, delayMs, keyCommand, "ioctl"));
     emit modelChanged();}
 
-/*
-void SwipeModel::addKey(const QString &keyName, int delayMs) {
-    m_actions.append(SwipeAction(SwipeAction::Key, 0, 0, 0, 0, 0, delayMs, keyName, "root"));
-    emit modelChanged();}
-*/
-
 SwipeAction SwipeModel::actionAt(int index) const {
     if (index >= 0 && index < m_actions.size()) {
         return m_actions.at(index);}
@@ -64,35 +58,39 @@ QJsonArray SwipeModel::toJsonSequence() const {
 
 QJsonObject SwipeModel::actionToJson(const SwipeAction &action) const {
     QJsonObject obj;
-    QString finalCommand;
-    obj["delayAfterMs"] = action.delayAfterMs;
-    QString mode = action.runMode.isEmpty() ? "shell" : action.runMode.toLower();
-    if (action.type == SwipeAction::Command) {
-        if (action.command.startsWith("HW_") || action.command.startsWith("key ") || action.command.startsWith("tap ")) {
-            mode = "ioctl";
-        }
-    }
-    bool isHw = (mode == "hw" || mode == "hw_direct" || mode == "ioctl");
-    if (isHw) mode = "ioctl";
+    obj["delayAfterMs"] = action.delayAfterMs;    
+    QString mode = action.runMode.toLower();
+    if (mode.isEmpty()) mode = "shell";
+    if (mode == "hw" || mode == "hw_direct") mode = "ioctl";
     obj["runMode"] = mode;
     obj["stopOnError"] = true;
+
+    QString finalCommand;
+    bool isIoctl = (mode == "ioctl");
+
     switch (action.type) {
         case SwipeAction::Tap:
-            finalCommand = isHw ? QString("tap %1 %2").arg(action.x1).arg(action.y1)
-                                : QString("input tap %1 %2").arg(action.x1).arg(action.y1);
+            finalCommand = isIoctl ? QString("tap %1 %2").arg(action.x1).arg(action.y1)
+                                   : QString("input tap %1 %2").arg(action.x1).arg(action.y1);
             break;
         case SwipeAction::Swipe:
-            finalCommand = isHw ? QString("swipe %1 %2 %3 %4 %5").arg(action.x1).arg(action.y1).arg(action.x2).arg(action.y2).arg(action.duration)
-                                : QString("input swipe %1 %2 %3 %4 %5").arg(action.x1).arg(action.y1).arg(action.x2).arg(action.y2).arg(action.duration);
+            finalCommand = isIoctl ? QString("swipe %1 %2 %3 %4 %5").arg(action.x1).arg(action.y1).arg(action.x2).arg(action.y2).arg(action.duration)
+                                   : QString("input swipe %1 %2 %3 %4 %5").arg(action.x1).arg(action.y1).arg(action.x2).arg(action.y2).arg(action.duration);
             break;
-        case SwipeAction::Key:
-            finalCommand = isHw ? QString("key %1").arg(action.command)
-                                : QString("input keyevent %1").arg(action.command);
+        case SwipeAction::Key: {
+            QString cleanKey = action.command;
+            cleanKey.remove("input keyevent ");
+            cleanKey.remove("key ");
+            
+            finalCommand = isIoctl ? QString("key %1").arg(cleanKey)
+                                   : QString("input keyevent %1").arg(cleanKey);
             break;
+        }
         case SwipeAction::Command:
-            finalCommand = action.command; 
+            finalCommand = action.command;
             break;
     }
+    
     obj["command"] = finalCommand;
     return obj;
 }
