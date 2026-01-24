@@ -19,50 +19,71 @@ ViewHardwareGrabbed::ViewHardwareGrabbed(CommandExecutor *executor, QWidget *par
     this->setFocusPolicy(Qt::StrongFocus); 
     m_logic = new HardwareGrabbed(this);
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(5, 5, 5, 5);
-    m_statusLabel = new QLabel("service 22222: disconnected");
-    m_statusLabel->setStyleSheet("color: #f44336; font-weight:");
+    mainLayout->setContentsMargins(4, 4, 4, 4);
+    mainLayout->setSpacing(6);
+    m_statusLabel = new QLabel("SERVICE: DISCONNECTED");
+    m_statusLabel->setStyleSheet("color: #f44336; font-size: 10px; font-weight: bold;");
     mainLayout->addWidget(m_statusLabel);
-    QHBoxLayout *topControls = new QHBoxLayout();
-    recordCheckBox = new QCheckBox("REC", this);
-    m_connectBtn = new QPushButton("🔗 connect service");
-    topControls->addWidget(recordCheckBox);
-    topControls->addWidget(m_connectBtn);
-    mainLayout->addLayout(topControls);
-    QGridLayout *systemGrid = new QGridLayout();
-    QPushButton *btnWifi  = new QPushButton("🌐 adb connect:1337");
-    QPushButton *btnGrab  = new QPushButton("🔒 KERNEL GRAB");
+    QHBoxLayout *topRow = new QHBoxLayout();
+    recordCheckBox = new QCheckBox("REC");
+    recordCheckBox->setToolTip("Record hardware events to sequence");
+    m_connectBtn = new QPushButton("🔗 Connect");
+    m_connectBtn->setFixedHeight(26);
+    
+    topRow->addWidget(recordCheckBox);
+    topRow->addWidget(m_connectBtn, 1);
+    mainLayout->addLayout(topRow);
+
+    QGridLayout *actionGrid = new QGridLayout();
+    actionGrid->setSpacing(4);
+
+    QPushButton *btnWifi = new QPushButton("🌐 ADB:1337");
+    btnWifi->setToolTip("Connect ADB over Wireless");
+    
+    QPushButton *btnGrab = new QPushButton("🔒 KERNEL GRAB");
     btnGrab->setCheckable(true);
-    systemGrid->addWidget(btnWifi, 0, 0, 1, 2);
-    systemGrid->addWidget(btnGrab, 1, 0, 1, 2);
-    mainLayout->addLayout(systemGrid);
-    QGroupBox *keyBox = new QGroupBox("Hardware Keyboard");
-    QVBoxLayout *keyBoxLayout = new QVBoxLayout(keyBox);
+    btnGrab->setToolTip("EVIOCGRAB: Take exclusive control of input");
+    btnGrab->setStyleSheet("QPushButton:checked { background-color: #d32f2f; color: white; }");
+
+    actionGrid->addWidget(btnWifi, 0, 0);
+    actionGrid->addWidget(btnGrab, 0, 1);
+    mainLayout->addLayout(actionGrid);
+
+    QFrame *line = new QFrame();
+    line->setFrameShape(QFrame::HLine);
+    line->setFrameShadow(QFrame::Sunken);
+    line->setStyleSheet("background-color: #444;");
+    mainLayout->addWidget(line);
+
     m_hwKeyboardWidget = new HardwareKeyboard(m_logic, this);
-    keyBoxLayout->addWidget(m_hwKeyboardWidget);
-	mainLayout->addWidget(keyBox);
-    QHBoxLayout *adminLayout = new QHBoxLayout();
-    QPushButton *btnStatus = new QPushButton("status");
-    QPushButton *btnKill   = new QPushButton("--daemon stop");
-    btnKill->setStyleSheet("color: #d32f2f;");
-    adminLayout->addWidget(btnStatus);
-    adminLayout->addWidget(btnKill);
-    mainLayout->addLayout(adminLayout);
+    mainLayout->addWidget(m_hwKeyboardWidget);
+
+    QHBoxLayout *adminRow = new QHBoxLayout();
+    adminRow->setSpacing(4);
+    QPushButton *btnStatus = new QPushButton("Status");
+    btnStatus->setFixedHeight(22);
+    btnStatus->setStyleSheet("font-size: 11px;");
+    QPushButton *btnKill = new QPushButton("Stop Daemon");
+    btnKill->setFixedHeight(22);
+    btnKill->setStyleSheet("color: #d32f2f; font-size: 11px; font-weight: bold;");
+    adminRow->addWidget(btnStatus);
+    adminRow->addWidget(btnKill);
+    mainLayout->addLayout(adminRow);
+
     mainLayout->addStretch();
-	connect(m_hwKeyboardWidget, &HardwareKeyboard::keyTriggered, this, &ViewHardwareGrabbed::handleKeyAction);
+
+    connect(m_hwKeyboardWidget, &HardwareKeyboard::keyTriggered, this, &ViewHardwareGrabbed::handleKeyAction);
     connect(m_connectBtn, &QPushButton::clicked, this, &ViewHardwareGrabbed::onConnectClicked);
     connect(btnKill, &QPushButton::clicked, this, &ViewHardwareGrabbed::onKillClicked);
     connect(btnStatus, &QPushButton::clicked, this, &ViewHardwareGrabbed::onCheckStatusClicked);
     connect(btnWifi, &QPushButton::clicked, this, [this]{ if(m_logic->isConnected()) m_logic->enableAdbWireless(); });
-    connect(btnGrab, &QPushButton::toggled, this, [this](bool checked){m_logic->setHardwareGrab(checked);});
-    connect(m_logic, &HardwareGrabbed::remoteTouchEvent, 
-        this, [this](uint16_t axis, uint16_t val) {
-    if (axis == 0x35) { // X
-        qDebug() << "PHONE TOUCH X:" << val;
-    } else if (axis == 0x36) { // Y
-        qDebug() << "PHONE TOUCH Y:" << val;
-    }
-});}
+    connect(btnGrab, &QPushButton::toggled, this, [this](bool checked){ m_logic->setHardwareGrab(checked); });
+    
+    connect(m_logic, &HardwareGrabbed::remoteTouchEvent, this, [this](uint16_t axis, uint16_t val) {
+        if (axis == 0x35) qDebug() << "PHONE X:" << val;
+        else if (axis == 0x36) qDebug() << "PHONE Y:" << val;
+    });
+}
 
 void ViewHardwareGrabbed::handleKeyAction(int linuxCode) {
     if (isRecordModeActive() && m_recordModel) {
