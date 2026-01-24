@@ -100,8 +100,10 @@ MainWindow::MainWindow(QWidget *parent, const QString &adbPath, const QString &t
     m_videoClient = new VideoClient(this);
     m_videoClient->setAdbPath(adbPath);
     m_videoClient->setDeviceSerial(targetSerial);
-    m_commandTimer = new QTimer(this);
-    connect(m_commandTimer, &QTimer::timeout, this, &MainWindow::executeScheduledCommand); 
+	m_commandTimer = new QTimer(this);
+	m_commandTimer->setInterval(100);
+	connect(m_commandTimer, &QTimer::timeout, this, &MainWindow::onCountdownTick);
+//	connect(m_commandTimer, &QTimer::timeout, this, &MainWindow::executeScheduledCommand); 
     m_sequenceRunner = new SequenceRunner(m_executor, this);
     connect(m_sequenceRunner, &SequenceRunner::sequenceStarted, this, &MainWindow::onSequenceStarted);
     connect(m_sequenceRunner, &SequenceRunner::sequenceFinished, this, &MainWindow::onSequenceFinished);
@@ -121,12 +123,13 @@ MainWindow::MainWindow(QWidget *parent, const QString &adbPath, const QString &t
     m_displayTimer = new QTimer(this);
     m_displayTimer->setInterval(100);
     connect(m_displayTimer, &QTimer::timeout, this, &MainWindow::updateTimerDisplay);
-    m_displayTimer->start();
+	m_displayTimer->start();
+	m_remainingMs = 0;
     m_isRootShell = m_settings.value("isRootShell", false).toBool();
     connect(m_executor, &CommandExecutor::outputReceived, this, &MainWindow::onOutput);
     connect(m_executor, &CommandExecutor::errorReceived, this, &MainWindow::onError);
     connect(m_executor, &CommandExecutor::started, this, &MainWindow::onProcessStarted);
-    connect(m_executor, &CommandExecutor::finished, this, &MainWindow::onProcessFinished);
+	connect(m_executor, &CommandExecutor::finished, this, &MainWindow::onCommandFinished);
     setupMenus();
 // Kategorie
     m_categoryList = new QListWidget();
@@ -177,7 +180,7 @@ MainWindow::MainWindow(QWidget *parent, const QString &adbPath, const QString &t
     m_log = new QTextEdit();
     m_log->setReadOnly(true);
     m_log->setStyleSheet("background: #000; color: #f0f0f0; font-family: monospace;");
-    m_dockLog = new QDockWidget(tr("Execution Console"), this);
+    m_dockLog = new QDockWidget(tr("Log Output"), this);
     m_dockLog->setObjectName("dockLog");
     m_dockLog->setWidget(m_log);
     m_dockLog->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea | Qt::RightDockWidgetArea);
@@ -379,6 +382,7 @@ void MainWindow::setupSequenceDock() {
     m_dockSequence->setWidget(m_viewSequencerunner); 
     addDockWidget(Qt::RightDockWidgetArea, m_dockSequence);}
 
+// Controls
 QWidget* MainWindow::createControlsWidget() {
     QWidget *w = new QWidget();
     w->setMinimumHeight(90); 
@@ -401,7 +405,7 @@ QWidget* MainWindow::createControlsWidget() {
     mixedLayout->addSpacing(10);
     m_intervalSpinBox = new QSpinBox();
     m_intervalSpinBox->setRange(1, 86400000);
-    m_intervalSpinBox->setValue(5000);
+    m_intervalSpinBox->setValue(5);
     m_intervalSpinBox->setSuffix(" ms");
     m_intervalSpinBox->setMaximumWidth(100);
     mixedLayout->addWidget(m_intervalSpinBox);
@@ -411,37 +415,35 @@ QWidget* MainWindow::createControlsWidget() {
     m_commandTimerLabel = new QLabel("(0ms)");
     m_commandTimerLabel->setStyleSheet("color: black; font-weight: normal;");
     mixedLayout->addWidget(m_commandTimerLabel);
-	m_scheduleBtn = new QPushButton("Schedule");
-	m_scheduleBtn->setMaximumWidth(70);
-	m_scheduleBtn->setStyleSheet("background-color: #FFAA00; color: black;");
+    m_scheduleBtn = new QPushButton("Schedule");
+    m_scheduleBtn->setMaximumWidth(70);
+    m_scheduleBtn->setStyleSheet("background-color: #FFAA00; color: black;");
     connect(m_scheduleBtn, &QPushButton::clicked, this, &MainWindow::onScheduleButtonClicked);
     mixedLayout->addWidget(m_scheduleBtn);    
     QPushButton *stopTimerBtn = new QPushButton("Stop");
-	stopTimerBtn->setMaximumWidth(50);
-	stopTimerBtn->setStyleSheet("background-color: #FF0000; color: black;");
+    stopTimerBtn->setMaximumWidth(50);
+    stopTimerBtn->setStyleSheet("background-color: #FF0000; color: black;");
     connect(stopTimerBtn, &QAbstractButton::clicked, this, [this]{
         if (m_commandTimer->isActive()) {
             m_commandTimer->stop();
-			m_intervalToggle->setChecked(false);
-			appendLog("Timer stopped.", "#E68D8D");
-			m_commandTimerLabel->setText("(0ms)");}});
+            m_intervalToggle->setChecked(false);
+            appendLog("Timer stopped.", "#E68D8D");
+            m_commandTimerLabel->setText("(0ms)");}});
     mixedLayout->addWidget(stopTimerBtn);
     mainLayout->addLayout(mixedLayout);
-	auto btnLayout = new QHBoxLayout();
-// Checkbox IOCTL (Direct Hardware)
-	m_ioctlToggle = new QCheckBox("ioctl");
-	m_ioctlToggle->setToolTip("Direct Hardware Injection via hw_resident");
-	m_ioctlToggle->setChecked(m_settings.value("isIoctlCommand", false).toBool());
-	connect(m_ioctlToggle, &QCheckBox::checkStateChanged, this, [this](int state) {
-		bool isChecked = (state == Qt::Checked);
-		m_settings.setValue("isIoctlCommand", isChecked);
-		if(isChecked) {
-			m_rootToggle->setChecked(false);
-			m_shellToggle->setChecked(false);
-		}
-	});
-	btnLayout->addWidget(m_ioctlToggle);
-// Checkbox root
+    auto btnLayout = new QHBoxLayout();
+    m_ioctlToggle = new QCheckBox("ioctl");
+    m_ioctlToggle->setToolTip("Direct Hardware Injection via hw_resident");
+    m_ioctlToggle->setChecked(m_settings.value("isIoctlCommand", false).toBool());
+    connect(m_ioctlToggle, &QCheckBox::checkStateChanged, this, [this](int state) {
+        bool isChecked = (state == Qt::Checked);
+        m_settings.setValue("isIoctlCommand", isChecked);
+        if(isChecked) {
+            m_rootToggle->setChecked(false);
+            m_shellToggle->setChecked(false);
+        }
+    });
+    btnLayout->addWidget(m_ioctlToggle);
     m_rootToggle = new QCheckBox("root");
     m_rootToggle->setChecked(m_isRootShell);
     connect(m_rootToggle, &QCheckBox::checkStateChanged, this, [this](int state) {
@@ -453,6 +455,10 @@ QWidget* MainWindow::createControlsWidget() {
     connect(m_shellToggle, &QCheckBox::checkStateChanged, this, [this](int state) {
         m_settings.setValue("isShellCommand", (state == Qt::Checked));});
     btnLayout->addWidget(m_shellToggle);    
+    btnLayout->addSpacing(10);
+    m_measureTimeControlsCheck = new QCheckBox("⏱️timer");
+    m_measureTimeControlsCheck->setToolTip("Mierz czas wykonania pojedynczej komendy");
+    btnLayout->addWidget(m_measureTimeControlsCheck);
     btnLayout->addSpacing(20);
     m_runBtn = new QPushButton("Execute");
     m_runBtn->setStyleSheet("background-color: #3CB043;");
@@ -464,6 +470,7 @@ QWidget* MainWindow::createControlsWidget() {
     m_clearBtn = new QPushButton("Clear Log");
     connect(m_clearBtn, &QPushButton::clicked, [this](){ m_log->clear(); m_detachedLogDialog->clear(); });
     btnLayout->addWidget(m_clearBtn);    
+
     m_saveBtn = new QPushButton("Save Log");
     connect(m_saveBtn, &QPushButton::clicked, [this](){
         QString defDir = "/usr/local/log";
@@ -477,7 +484,37 @@ QWidget* MainWindow::createControlsWidget() {
                 f.close();}}});
     btnLayout->addWidget(m_saveBtn);
     mainLayout->addLayout(btnLayout);
-    return w;}
+    return w;
+}
+
+
+void MainWindow::onCommandFinished(int exitCode) {
+    if (m_measureTimeControlsCheck && m_measureTimeControlsCheck->isChecked()) {
+        qint64 elapsed = m_commandExecutionTimer.elapsed();
+        appendLog(QString(">>> elapsed:⏱️ %1 ms").arg(elapsed), "#AEEA00");
+    }
+    if (!m_intervalToggle->isChecked()) {
+        m_commandTimer->stop();
+        m_commandTimerLabel->setText("(0ms)");
+    }
+    onProcessFinished(exitCode, QProcess::NormalExit);
+}
+
+void MainWindow::onCountdownTick() {
+    if (m_remainingMs <= 0) {
+        m_commandTimer->stop();
+        m_commandTimerLabel->setText("(0ms)");
+        runCommand();
+        return;
+    }
+    m_remainingMs -= 100;
+    
+    if (m_remainingMs > 1000) {
+        m_commandTimerLabel->setText(QString("(%1s)").arg(m_remainingMs / 1000.0, 0, 'f', 1));
+    } else {
+        m_commandTimerLabel->setText(QString("(%1ms)").arg(m_remainingMs));
+    }
+}
 
 void MainWindow::onSequenceStarted() {
     appendLog("--- [sequence runner]  STARTED ---", "#4CAF50");
@@ -498,26 +535,12 @@ void MainWindow::handleSequenceLog(const QString &text, const QString &color) {a
 
 void MainWindow::onScheduleButtonClicked() {
     const QString cmdText = m_commandEdit->text().trimmed();
-    const int interval = m_intervalSpinBox->value();
-    const bool periodic = m_intervalToggle->isChecked();    
-    if (cmdText.isEmpty()) {
-        QMessageBox::warning(this, "Schedule Error", "Command cannot be empty.");
-        return;}
-    bool safeMode = m_settings.value("safeMode", false).toBool();
-    if (safeMode && isDestructiveCommand(cmdText)) {
-        QMessageBox::warning(this, "Safe mode", "Application is in Safe Mode. Destructive commands are blocked from scheduling.");
-        return;}
-    if (m_commandTimer->isActive()) {
-        m_commandTimer->stop();
-        appendLog("Previous scheduled command canceled.", "#FFAA66");}
-    m_scheduledCommand = cmdText;
-    m_commandTimer->setSingleShot(!periodic);
-    m_commandTimer->setInterval(interval * 1000);    
-    if (periodic) {
-        appendLog(QString("Scheduled periodic command: %1 (every %2 s)").arg(cmdText).arg(interval), "#4CAF50");
-    } else {
-        appendLog(QString("Scheduled one-shot command: %1 (in %2 s)").arg(cmdText).arg(interval), "#00BCD4");}
-    m_commandTimer->start();}
+    if (cmdText.isEmpty()) return;
+    int intervalSeconds = m_intervalSpinBox->value();
+    m_remainingMs = intervalSeconds * 1000; 
+    m_commandTimer->start(100);
+    appendLog(QString("Scheduled in %1s: %2").arg(intervalSeconds).arg(cmdText), "#FFAA00");
+}
 
 void MainWindow::executeScheduledCommand() {
     const QString cmdToRun = m_scheduledCommand;
@@ -615,42 +638,26 @@ void MainWindow::onCommandDoubleClicked(const QModelIndex &index) {
         m_commandEdit->setText(cmd);
         runCommand();}}
 
-
 void MainWindow::runCommand() {
-    const QString cmdText = m_commandEdit->text().trimmed();
-    if (cmdText.isEmpty()) return;
-// Logika bezpieczeństwa (Safe Mode)
-    bool safeMode = m_settings.value("safeMode", false).toBool();
-    if (safeMode && isDestructiveCommand(cmdText)) {
-        QMessageBox::warning(this, "Safe mode", "Application is in Safe Mode. Destructive commands are blocked.");
-        return;}
-    if (isDestructiveCommand(cmdText)) {
-        auto reply = QMessageBox::question(this, "Confirm", 
-            QString("Command looks destructive:\n%1\nContinue?").arg(cmdText), 
-            QMessageBox::Yes | QMessageBox::No);
-        if (reply != QMessageBox::Yes) return;}
-// Zarządzanie historią komend
-    if (m_inputHistory.isEmpty() || m_inputHistory.last() != cmdText) {
-        m_inputHistory.append(cmdText);}
-    m_inputHistoryIndex = -1;    
-    QString mode = "adb";
-    QString logColor = "#FFE066";
-    QString logPrefix = ">>> adb: ";
-    if (m_ioctlToggle && m_ioctlToggle->isChecked()) {
-        mode = "ioctl";
-        logColor = "#BB86FC";
-        logPrefix = ">>> 💉ioctl: ";
-    } else if (m_rootToggle->isChecked()) {
-        mode = "root";
-        logColor = "#FF0000";
-        logPrefix = ">>> root: ";
-    } else if (m_shellToggle->isChecked()) {
-        mode = "shell";
-        logColor = "#00BCD4";
-        logPrefix = ">>> shell: ";
+    QString cmd = m_commandEdit->text().trimmed();
+    if (cmd.isEmpty()) return;
+    if (m_measureTimeControlsCheck && m_measureTimeControlsCheck->isChecked()) {
+        m_commandExecutionTimer.start();
     }
-    appendLog(logPrefix + cmdText, logColor);
-    m_executor->executeSequenceCommand(cmdText, mode);
+    if (m_ioctlToggle->isChecked()) {
+        m_executor->executeSequenceCommand(cmd, "ioctl");
+    } else if (m_rootToggle->isChecked()) {
+        m_executor->executeSequenceCommand(cmd, "root");
+    } else {
+        m_executor->executeSequenceCommand(cmd, "shell");
+    }
+    if (m_intervalToggle->isChecked() && !m_commandTimer->isActive()) {
+        int ms = m_intervalSpinBox->value();
+        m_commandTimer->setInterval(ms);
+        m_remainingMs = ms;
+        m_commandTimer->start();
+        appendLog(QString("🔄 Periodic execution started (every %1 ms)").arg(ms), "#00BCD4");
+    }
 }
 
 void MainWindow::stopCommand() {if (m_executor) {m_executor->stop();appendLog("Process stopped by user (adb terminated).", "#FFAA66");}}
