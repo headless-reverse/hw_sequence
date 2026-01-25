@@ -14,6 +14,7 @@
 #include <QProcess>
 #include <QSettings>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QDir>
 #include <QComboBox>
 #include <QStandardItemModel>
@@ -71,13 +72,15 @@ private slots:
     void onOutput(const QString &text);
     void onError(const QString &text);
     void onProcessStarted();
-    void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
-    void restoreDefaultLayout();
-    void showSettingsDialog();
-    void navigateHistory(int direction);    
+	void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+	void onCommandFinished(int exitCode);
+	void restoreDefaultLayout();
+	void showSettingsDialog();
+	void navigateHistory(int direction);    
     void onScheduleButtonClicked();
     void executeScheduledCommand();
-    void updateTimerDisplay();
+	void updateTimerDisplay();
+	void onCountdownTick();
     void startIntervalSequence();
     void onSequenceStarted();
     void onSequenceFinished(bool success);
@@ -100,7 +103,8 @@ private:
     QStandardItemModel *m_commandModel = nullptr;
     QSortFilterProxyModel *m_commandProxy = nullptr;
     QLineEdit *m_commandEdit = nullptr;
-    QTextEdit *m_log = nullptr;
+	QTextEdit *m_log = nullptr;
+	
     QPushButton *m_runBtn = nullptr;
     QPushButton *m_stopBtn = nullptr;
     QPushButton *m_clearBtn = nullptr;
@@ -118,15 +122,18 @@ private:
     QCheckBox *m_shellToggle = nullptr;
 	QCheckBox *m_rootToggle = nullptr;
 	QCheckBox *m_ioctlToggle = nullptr;
+	QCheckBox *m_measureTimeControlsCheck = nullptr;
     bool m_isRootShell = false;
-    QTimer *m_commandTimer = nullptr;
+	QTimer *m_commandTimer = nullptr;
+	QElapsedTimer m_commandExecutionTimer;
+	qint64 m_remainingMs = 0;
     QLabel *m_commandTimerLabel = nullptr;
     QSpinBox *m_intervalSpinBox = nullptr;
     QCheckBox *m_intervalToggle = nullptr;
     QString m_scheduledCommand;
 
     QVector<QString> m_sequenceQueue;
-    QTimer *m_displayTimer = nullptr;
+	QTimer *m_displayTimer = nullptr;
     QAction *m_addCommandAct = nullptr;
     QAction *m_editCommandAct = nullptr;
     QAction *m_removeCommandAct = nullptr;
