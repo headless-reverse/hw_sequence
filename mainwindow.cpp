@@ -242,7 +242,6 @@ MainWindow::MainWindow(QWidget *parent, const QString &adbPath, const QString &t
 	m_dockKeyboard->setAllowedAreas(Qt::AllDockWidgetAreas);
 	addDockWidget(Qt::RightDockWidgetArea, m_dockKeyboard);
 	connect(m_keyboardWidget, &KeyboardWidget::adbCommandGenerated, this, [this](const QString &cmd){
-//		m_executor->executeAdbCommand(QString("shell su -c \"%1\"").arg(cmd));
 		m_executor->executeSequenceCommand(cmd, "root");
 		if (m_keyboardWidget->isRecordModeActive()) {
 			QString keyOnly = cmd.startsWith("input keyevent") ? cmd.mid(15).trimmed() : cmd;
@@ -644,20 +643,45 @@ void MainWindow::runCommand() {
     if (m_measureTimeControlsCheck && m_measureTimeControlsCheck->isChecked()) {
         m_commandExecutionTimer.start();
     }
+// Definicja wykonawcy (Logika priorytetów)
     if (m_ioctlToggle->isChecked()) {
         m_executor->executeSequenceCommand(cmd, "ioctl");
-    } else if (m_rootToggle->isChecked()) {
+    } 
+    else if (m_rootToggle->isChecked()) {
         m_executor->executeSequenceCommand(cmd, "root");
-    } else {
+    } 
+    else if (m_shellToggle->isChecked()) {
         m_executor->executeSequenceCommand(cmd, "shell");
+    } 
+    else {
+        // FALLBACK: Jeśli nic nie zaznaczone
+        if (cmd.startsWith("adb ") || cmd.startsWith("printf ") || cmd.contains("|")) {
+            // Wykonaj jako surowe polecenie (np. Twoje printf | nc)
+            m_executor->executeAdbCommand(cmd); 
+        } else {
+            // Domyślnie traktuj jako shell, aby zachować prefix adb shell
+            m_executor->executeSequenceCommand(cmd, "shell");
+        }
     }
-    if (m_intervalToggle->isChecked() && !m_commandTimer->isActive()) {
-        int ms = m_intervalSpinBox->value();
-        m_commandTimer->setInterval(ms);
-        m_remainingMs = ms;
-        m_commandTimer->start();
-        appendLog(QString("🔄 Periodic execution started (every %1 ms)").arg(ms), "#00BCD4");
+    if (m_intervalToggle->isChecked()) {
+        if (!m_commandTimer->isActive()) {
+            int ms = m_intervalSpinBox->value();
+            m_commandTimer->setInterval(ms);
+            m_remainingMs = ms;
+            m_commandTimer->start();
+            appendLog(QString("🔄 Periodic execution started (every %1 ms)").arg(ms), "#00BCD4");
+        }
+    } else {
+        // Jeśli odznaczono Interval w trakcie trwania, zatrzymaj przy następnym cyklu
+        if (m_commandTimer->isActive()) {
+            m_commandTimer->stop();
+            m_commandTimerLabel->setText("(0s)");
+        }
     }
+    if (m_inputHistory.isEmpty() || m_inputHistory.last() != cmd) {
+        m_inputHistory.append(cmd);
+    }
+    m_inputHistoryIndex = -1;
 }
 
 void MainWindow::stopCommand() {if (m_executor) {m_executor->stop();appendLog("Process stopped by user (adb terminated).", "#FFAA66");}}
