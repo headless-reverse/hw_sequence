@@ -33,11 +33,9 @@ private:
         WaitingForDeviceData
     };
     State m_state = Idle;
-    
     QTcpSocket *m_socket;
     QByteArray m_readBuffer;
     QString m_targetSerial;
-
     void writeAdbHeader(const QString &command);
     void processAdbStatus();
     void handleDeviceData();
