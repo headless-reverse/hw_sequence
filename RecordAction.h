@@ -5,17 +5,16 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QLabel>
+#include <QComboBox>
 
-class RecordAction : public QDialog
-{
+class RecordAction : public QDialog {
     Q_OBJECT
-
 public:
     explicit RecordAction(QWidget *parent = nullptr);
     ~RecordAction();
 
 signals:
-    void actionTriggered(const QString &text);
+    void actionTriggered(const QString &actionName, const QString &runMode);
 
 private slots:
     void onActionClicked();
@@ -23,8 +22,9 @@ private slots:
 
 private:
     QLineEdit *m_edit;
-    QPushButton *m_btn;
     QLabel *m_highlight;
+    QPushButton *m_btn;
+    QComboBox *m_runModeCombo;
 };
 
 #endif // RECORDACTION_H
