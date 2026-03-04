@@ -17,15 +17,18 @@ enum class ControllerState {
     Error
 };
 
+
 class HardwareController : public QObject {
     Q_OBJECT
+
 public:
     explicit HardwareController(QObject *parent = nullptr);
 
-	ControllerState state() const { return m_state; }
-	void connectToDevice(const QString &serial);
+    ControllerState state() const { return m_state; }
+    void connectToDevice(const QString &serial);
     void disconnectDevice();
     void sendAction(const ControlPacket &pkt);
+    void sendRaw(const QByteArray &data);
 
 signals:
     void stateChanged(ControllerState newState);
@@ -47,4 +50,4 @@ private:
     void startRemoteDaemon();
 };
 
-#endif
+#endif 
