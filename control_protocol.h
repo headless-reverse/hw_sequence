@@ -6,16 +6,27 @@
 #define PROTOCOL_HEAD 0x55
 
 enum ControlEventType : uint8_t {
-    EVENT_TYPE_KEY         = 1,
-    EVENT_TYPE_TOUCH_DOWN  = 2,
-    EVENT_TYPE_TOUCH_UP    = 3,
-    EVENT_TYPE_TOUCH_MOVE  = 4,
-    EVENT_TYPE_SCROLL      = 5,
-    EVENT_TYPE_BACK        = 6,
-	EVENT_TYPE_HOME        = 7,
-	EVENT_TYPE_ADB_WIFI    = 20,
-	EVENT_TYPE_SET_GRAB    = 21,
-	EVENT_TYPE_REPORT_TOUCH = 30
+	EVENT_TYPE_KEY				= 1,
+	EVENT_TYPE_TOUCH_DOWN		= 2,
+	EVENT_TYPE_TOUCH_UP			= 3,
+	EVENT_TYPE_TOUCH_MOVE		= 4,
+	EVENT_TYPE_SCROLL			= 5,
+	EVENT_TYPE_BACK				= 6,
+	EVENT_TYPE_HOME				= 7,
+	EVENT_TYPE_ADB_WIFI			= 20,
+	EVENT_TYPE_GRAB_TOUCH		= 21,
+	EVENT_TYPE_GRAB_KEYS		= 22,
+	EVENT_TYPE_GET_PROCS		= 23,
+	EVENT_TYPE_INJECT_PID		= 24,
+	EVENT_TYPE_GET_MEM_MAPS		= 25,
+	EVENT_TYPE_READ_MEM			= 26,
+	EVENT_TYPE_KILL_PROC		= 27,
+	EVENT_TYPE_PROC_STATUS		= 28,
+	EVENT_TYPE_CHECK_LIB		= 29,
+	EVENT_TYPE_SET_LIB_PATH     = 30,
+	EVENT_TYPE_SCAN_LIBS		= 31,
+	EVENT_TYPE_GET_FD_LIST      = 32,
+	EVENT_TYPE_PANIC_RESET		= 99
 };
 
 #pragma pack(push, 1)
@@ -33,5 +44,5 @@ struct ControlPacket {
 ControlPacket createTouchPacket(ControlEventType type, uint16_t x, uint16_t y, uint16_t data = 0);
 ControlPacket createKeyPacket(uint16_t keyCode);
 QByteArray packetToByteArray(const ControlPacket& packet);
-uint8_t calculate_xor_crc(const ControlPacket& pkt); 
+uint8_t calculate_crc(const ControlPacket& pkt); 
 bool validatePacket(const ControlPacket& pkt);
