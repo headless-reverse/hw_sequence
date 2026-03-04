@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(hw_sequence VERSION 1.0 LANGUAGES CXX) 
+project(hw_injector VERSION 1.0 LANGUAGES CXX) 
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -82,13 +82,13 @@ if(DRM_FOUND)
     target_link_libraries(adb_shared_components PRIVATE ${DRM_LIBRARIES})
 endif()
 
-qt_add_executable(hw_sequence_d
+qt_add_executable(hw_injector_d
     main_d.cpp
     remoteserver.cpp
     remoteserver.h
 )
 
-target_link_libraries(hw_sequence_d
+target_link_libraries(hw_injector_d
     PUBLIC
         adb_shared_components
         Qt6::Core
@@ -98,10 +98,16 @@ target_link_libraries(hw_sequence_d
         Qt6::OpenGLWidgets
 )
 
-qt_add_executable(hw_sequence
+qt_add_executable(hw_injector
     main.cpp
     mainwindow.cpp
-    mainwindow.h
+	mainwindow.h
+	process_injector.cpp
+	process_injector.h
+	view_process_injector.cpp
+	view_process_injector.h
+	control_injector.cpp
+	control_injector.h
     settingsdialog.cpp
     settingsdialog.h
     view_swipe_builder.cpp
@@ -118,10 +124,14 @@ qt_add_executable(hw_sequence
     view_hardware_grabbed.h
     hw_keyboard.cpp
     hw_keyboard.h
-    hw_keyboard_map.h
+	hw_keyboard_map.h
+#	view_performance.cpp
+#	view_performance.h
+#	performance.cpp
+#	performance.h
 )
 
-target_link_libraries(hw_sequence
+target_link_libraries(hw_injector
     PUBLIC
         adb_shared_components
         Qt6::Core
@@ -132,5 +142,5 @@ target_link_libraries(hw_sequence
         Qt6::OpenGLWidgets
 )
 
-set_target_properties(hw_sequence_d PROPERTIES OUTPUT_NAME "hw_sequence_d")
-set_target_properties(hw_sequence PROPERTIES OUTPUT_NAME "hw_sequence")
+set_target_properties(hw_injector_d PROPERTIES OUTPUT_NAME "hw_injector_d")
+set_target_properties(hw_injector PROPERTIES OUTPUT_NAME "hw_injector")
