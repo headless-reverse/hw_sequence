@@ -20,7 +20,6 @@ void ActionEditDialog::setupUi() {
     }
     setWindowTitle(title);
     QFormLayout *formLayout = new QFormLayout(this);
-
     if (m_action.type == SwipeAction::Tap || m_action.type == SwipeAction::Swipe) {
         m_x1Spin = new QSpinBox(); m_x1Spin->setRange(0, 9999); m_x1Spin->setValue(m_action.x1);
         m_y1Spin = new QSpinBox(); m_y1Spin->setRange(0, 9999); m_y1Spin->setValue(m_action.y1);
@@ -41,9 +40,7 @@ void ActionEditDialog::setupUi() {
             m_commandEdit->setReadOnly(true);
             formLayout->addRow("Key Code:", m_commandEdit);
         } else {
-            formLayout->addRow("Command:", m_commandEdit);
-        }
-}
+            formLayout->addRow("Command:", m_commandEdit);}}
     m_runModeCombo = new QComboBox();
     m_runModeCombo->addItem("adb", "adb");
     m_runModeCombo->addItem("shell", "shell");
