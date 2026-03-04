@@ -29,8 +29,9 @@ public:
     QString adbPath() const { return m_adbPath; }
     QString targetDevice() const { return m_targetSerial; }
     bool isRunning() const;
-	HardwareController *m_hwController = nullptr;
+//	HardwareController *m_hwController = nullptr;
 	void setDeviceDimensions(int width, int height) { m_deviceWidth = width; m_deviceHeight = height; }
+	void setHardwareController(HardwareController *ctrl) { m_hwController = ctrl; }
 
 signals:
     void started();
@@ -60,6 +61,7 @@ private:
     QProcess *m_shellProcess = nullptr;
     AdbClient *m_adbClient = nullptr;
     HardwareGrabbed *m_hwGrab = nullptr;
+    HardwareController *m_hwController = nullptr;
     int m_deviceWidth = 0;
     int m_deviceHeight = 0;
     
