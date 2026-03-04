@@ -4,7 +4,6 @@
 #include <QMargins>
 #include <QGroupBox>
 
-// Stałe Android Key Codes
 #define KEYCODE_MEDIA_PLAY_PAUSE 85
 #define KEYCODE_VOLUME_UP 24
 #define KEYCODE_VOLUME_DOWN 25
