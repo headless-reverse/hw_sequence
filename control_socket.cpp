@@ -3,12 +3,13 @@
 #include <QDebug>
 #include <QHostAddress>
 #include <QtEndian>
+#include <arpa/inet.h>
 
 ControlSocket::ControlSocket(QObject *parent) 
     : QObject(parent), m_socket(new QTcpSocket(this)) {
     
-    connect(m_socket, &QTcpSocket::connected, this, &ControlSocket::onConnected);
-    connect(m_socket, &QTcpSocket::disconnected, this, &ControlSocket::onDisconnected);
+	connect(m_socket, &QTcpSocket::connected, this, &ControlSocket::onConnected);
+	connect(m_socket, &QTcpSocket::disconnected, this, &ControlSocket::onDisconnected);
 	connect(m_socket, QOverload<QTcpSocket::SocketError>::of(&QTcpSocket::errorOccurred),this, &ControlSocket::onErrorOccurred);
 	connect(m_socket, &QTcpSocket::readyRead, this, &ControlSocket::onReadyRead);
 }
@@ -35,51 +36,59 @@ void ControlSocket::onDisconnected() {
 
 void ControlSocket::onErrorOccurred(QTcpSocket::SocketError socketError) {
     if (socketError != QTcpSocket::RemoteHostClosedError) {
-        emit errorOccurred(QString("Control Socket Error: %1").arg(m_socket->errorString()));
-    }
-}
+        emit errorOccurred(QString("Control Socket Error: %1").arg(m_socket->errorString()));}}
 
 void ControlSocket::onReadyRead() {
     m_readBuffer.append(m_socket->readAll());
-    while (m_readBuffer.size() >= sizeof(ControlPacket)) {
-        if (static_cast<uint8_t>(m_readBuffer[0]) != PROTOCOL_HEAD) {
-            m_readBuffer.remove(0, 1);
-            continue;
+    while (m_readBuffer.size() >= static_cast<int>(sizeof(ControlPacket))) {
+        int headIdx = m_readBuffer.indexOf(PROTOCOL_HEAD);
+        if (headIdx == -1) {
+            m_readBuffer.clear();
+            break;}
+        if (headIdx > 0) {
+            m_readBuffer.remove(0, headIdx);
+            if (m_readBuffer.size() < static_cast<int>(sizeof(ControlPacket))) break;
         }
         ControlPacket pkt;
-        std::memcpy(&pkt, m_readBuffer.data(), sizeof(ControlPacket));
-//  CRC i Magic
-        if (validatePacket(pkt)) {
-            m_readBuffer.remove(0, sizeof(ControlPacket));
-// Obsługa raportu z fizycznego ekranu (Typ 30)
-            if (pkt.type == EVENT_TYPE_REPORT_TOUCH) {
-                uint16_t axis = qFromBigEndian<uint16_t>(pkt.data);
-                uint16_t val = 0;
-                if (axis == 0x35) val = qFromBigEndian<uint16_t>(pkt.x);
-                else if (axis == 0x36) val = qFromBigEndian<uint16_t>(pkt.y);
-                emit remoteTouchEvent(axis, val);
-            }
-        } else {
+        std::memcpy(&pkt, m_readBuffer.constData(), sizeof(ControlPacket));
+        if (!validatePacket(pkt)) {
             m_readBuffer.remove(0, 1);
-        }
-    }
+            continue;}
+        m_readBuffer.remove(0, sizeof(ControlPacket));
+        uint16_t x    = qFromBigEndian<uint16_t>(pkt.x);
+        uint16_t y    = qFromBigEndian<uint16_t>(pkt.y);
+        uint16_t data = qFromBigEndian<uint16_t>(pkt.data);
+		if (pkt.type == EVENT_TYPE_KEY) {
+			emit remoteTouchEvent(x, static_cast<uint32_t>(data));
+		} else {
+			emit remoteTouchEvent(pkt.type, static_cast<uint32_t>(x));
+		}
+	}
 }
 
 void ControlSocket::sendPacket(ControlEventType type, uint16_t x, uint16_t y, uint16_t data) {
-    if (m_socket->state() != QAbstractSocket::ConnectedState) return;
-    ControlPacket pkt;
-    pkt.head = PROTOCOL_HEAD;
-    pkt.magic = qToBigEndian<uint32_t>(CONTROL_MAGIC);
-    pkt.type = static_cast<uint8_t>(type);
-    pkt.x = qToBigEndian<uint16_t>(x);
-    pkt.y = qToBigEndian<uint16_t>(y);
-    pkt.data = qToBigEndian<uint16_t>(data);
-    pkt.crc = calculate_xor_crc(pkt); 
+	if (!m_socket || m_socket->state() != QAbstractSocket::ConnectedState) {
+		qDebug() << "[ControlSocket] Brak połączenia, pomijam pakiet:" << type;
+        return;
+    }
+    ControlPacket pkt = createTouchPacket(type, x, y, data);
     m_socket->write(reinterpret_cast<const char*>(&pkt), sizeof(ControlPacket));
-    m_socket->flush();
+    if (m_socket->bytesToWrite() > 1024) {
+        m_socket->flush();
+    }
 }
 
 void ControlSocket::sendTouchDown(uint16_t x, uint16_t y) { sendPacket(EVENT_TYPE_TOUCH_DOWN, x, y, 0); }
 void ControlSocket::sendTouchMove(uint16_t x, uint16_t y) { sendPacket(EVENT_TYPE_TOUCH_MOVE, x, y, 0); }
 void ControlSocket::sendTouchUp(uint16_t x, uint16_t y)   { sendPacket(EVENT_TYPE_TOUCH_UP, x, y, 0); }
 void ControlSocket::sendKey(uint16_t androidKeyCode)      { sendPacket(EVENT_TYPE_KEY, 0, 0, androidKeyCode); }
+
+void ControlSocket::sendBackKey() { sendPacket(EVENT_TYPE_BACK, 0, 0, 0); }
+void ControlSocket::sendHomeKey() { sendPacket(EVENT_TYPE_HOME, 0, 0, 0); }
+
+void ControlSocket::setDeviceGrab(bool enable) {
+	sendPacket(EVENT_TYPE_GRAB_TOUCH, 0, 0, enable ? 1 : 0);
+	sendPacket(EVENT_TYPE_GRAB_KEYS, 0, 0, enable ? 1 : 0);
+}
+
+void ControlSocket::sendAdbWifi() {sendPacket(EVENT_TYPE_ADB_WIFI, 0, 0, 0);}
