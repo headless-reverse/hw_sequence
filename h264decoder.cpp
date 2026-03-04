@@ -52,7 +52,6 @@ void H264Decoder::parseAndDecode(const QByteArray &data) {
         if (len < 0) break;
         curData += len;
         curSize -= len;
-
         if (m_pkt->size > 0) {
             decodePacket(m_pkt);
             av_packet_unref(m_pkt);}}}
